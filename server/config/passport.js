@@ -5,10 +5,10 @@ const User = require("../models/User");
 passport.use(
   new InstagramStrategy(
     {
-      clientID: process.env.REACT_APP_INSTAGRAM_APP_ID,
-      clientSecret: process.env.REACT_APP_INSTAGRAM_APP_SECRET,
+      clientID: process.env.INSTAGRAM_APP_ID,
+      clientSecret: process.env.INSTAGRAM_APP_SECRET,
       callbackURL:
-        process.env.REACT_APP_INSTAGRAM_REDIRECT_URI ||
+        process.env.INSTAGRAM_REDIRECT_URI ||
         "http://localhost:5000/auth/instagram/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
