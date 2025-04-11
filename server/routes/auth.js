@@ -1,81 +1,57 @@
 const express = require("express");
 const axios = require("axios");
-const passport = require("passport");
 const router = express.Router();
 
-const INSTAGRAM_API_BASE_URL = "https://api.instagram.com";
-
-// Ensure environment variables are set
-if (
-  !process.env.REACT_APP_INSTAGRAM_APP_ID ||
-  !process.env.REACT_APP_INSTAGRAM_APP_SECRET ||
-  !process.env.REACT_APP_INSTAGRAM_REDIRECT_URI
-) {
-  throw new Error(
-    "Missing Instagram environment variables. Please check your .env file."
-  );
-}
+const INSTAGRAM_API_BASE_URL = "https://graph.instagram.com";
+const INSTAGRAM_OAUTH_URL = "https://api.instagram.com/oauth/access_token";
 
 // Instagram login route
-router.get(
-  "/instagram",
-  passport.authenticate("instagram", { scope: ["user_profile", "user_media"] })
-);
-
-// Instagram callback route (GET)
-router.get(
-  "/instagram/callback",
-  passport.authenticate("instagram", { failureRedirect: "/" }),
-  (req, res) => {
-    // Successful authentication, redirect to frontend profile page
-    res.redirect(`${process.env.REACT_APP_CLIENT_URL}/profile`);
-  }
-);
-
-// Instagram callback route (POST)
-router.post("/instagram/callback", async (req, res) => {
-  const { code } = req.body;
-
-  try {
-    const response = await axios.post(
-      `${INSTAGRAM_API_BASE_URL}/oauth/access_token`,
-      {
-        client_id: process.env.REACT_APP_INSTAGRAM_APP_ID,
-        client_secret: process.env.REACT_APP_INSTAGRAM_APP_SECRET,
-        grant_type: "authorization_code",
-        redirect_uri: process.env.REACT_APP_INSTAGRAM_REDIRECT_URI,
-        code,
-      }
-    );
-
-    const { access_token, user_id } = response.data;
-
-    // Fetch user details or save the access token in the database
-    res.json({ success: true, access_token, user_id });
-  } catch (error) {
-    console.error(
-      "Error exchanging code for access token:",
-      error.response?.data || error.message
-    );
-    res.status(500).json({
-      success: false,
-      error:
-        "Failed to exchange code for access token. Please try again later.",
-    });
-  }
+router.get("/instagram", (req, res) => {
+  const instagramLoginUrl = `https://www.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${process.env.INSTAGRAM_REDIRECT_URI}&scope=user_profile,user_media&response_type=code`;
+  res.redirect(instagramLoginUrl);
 });
 
-// Logout route
-router.get("/logout", (req, res) => {
-  req.logout((err) => {
-    if (err) {
-      console.error("Error during logout:", err);
-      return res
-        .status(500)
-        .json({ success: false, error: "Failed to log out" });
-    }
-    res.redirect(process.env.REACT_APP_CLIENT_URL || "/");
-  });
+// Instagram callback route
+router.get("/instagram/callback", async (req, res) => {
+  const { code } = req.query;
+
+  try {
+    // Exchange code for access token
+    const tokenResponse = await axios.post(INSTAGRAM_OAUTH_URL, {
+      client_id: process.env.INSTAGRAM_APP_ID,
+      client_secret: process.env.INSTAGRAM_APP_SECRET,
+      grant_type: "authorization_code",
+      redirect_uri: process.env.INSTAGRAM_REDIRECT_URI,
+      code,
+    });
+
+    const { access_token } = tokenResponse.data;
+
+    // Fetch user profile
+    const profileResponse = await axios.get(
+      `${INSTAGRAM_API_BASE_URL}/me?fields=id,username,account_type,media_count&access_token=${access_token}`
+    );
+
+    const profile = profileResponse.data;
+
+    // Fetch user media
+    const mediaResponse = await axios.get(
+      `${INSTAGRAM_API_BASE_URL}/me/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,username&access_token=${access_token}`
+    );
+
+    const media = mediaResponse.data.data;
+
+    // Send profile and media to the frontend
+    res.json({ success: true, profile, media });
+  } catch (error) {
+    console.error(
+      "Error during Instagram callback:",
+      error.response?.data || error.message
+    );
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch data from Instagram." });
+  }
 });
 
 module.exports = router;
