@@ -15,6 +15,15 @@ router.get("/instagram", (req, res) => {
 router.get("/instagram/callback", async (req, res) => {
   const { code } = req.query;
 
+  console.log("Received callback with code:", code); // Debugging log
+
+  if (!code) {
+    console.error("Authorization code is missing.");
+    return res
+      .status(400)
+      .json({ success: false, error: "Authorization code is missing." });
+  }
+
   try {
     // Exchange code for access token
     const tokenResponse = await axios.post(INSTAGRAM_OAUTH_URL, {
@@ -25,6 +34,8 @@ router.get("/instagram/callback", async (req, res) => {
       code,
     });
 
+    console.log("Access token response:", tokenResponse.data); // Debugging log
+
     const { access_token } = tokenResponse.data;
 
     // Fetch user profile
@@ -32,12 +43,16 @@ router.get("/instagram/callback", async (req, res) => {
       `${INSTAGRAM_API_BASE_URL}/me?fields=id,username,account_type,media_count&access_token=${access_token}`
     );
 
+    console.log("User profile response:", profileResponse.data); // Debugging log
+
     const profile = profileResponse.data;
 
     // Fetch user media
     const mediaResponse = await axios.get(
       `${INSTAGRAM_API_BASE_URL}/me/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,username&access_token=${access_token}`
     );
+
+    console.log("User media response:", mediaResponse.data); // Debugging log
 
     const media = mediaResponse.data.data;
 
