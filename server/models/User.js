@@ -1,16 +1,14 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const UserSchema = new mongoose.Schema({
-  instagramId: String,
-  username: String,
-  name: String,
-  profilePicture: String,
-  accessToken: String,
-  media: Array,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+// Define the schema
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  instagramId: { type: String, required: true },
+  accessToken: { type: String, required: true },
 });
 
-module.exports = mongoose.model('User', mongoose.Schema);
+// Create the model
+const User = mongoose.model("User", userSchema);
+
+module.exports = User;
