@@ -24,7 +24,7 @@ mongoose
 // Middleware
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: process.env.REACT_APP_CLIENT_URL,
     credentials: true,
   })
 );
@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 // Setup session
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.REACT_APP_SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
   })

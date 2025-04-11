@@ -1,84 +1,84 @@
-const express = require('express');
-const axios = require('axios');
-const User = require('../models/User');
-const Comment = require('../models/Comment');
+const express = require("express");
+const axios = require("axios");
+const User = require("../models/User");
+const Comment = require("../models/Comment");
 const router = express.Router();
+
+const INSTAGRAM_API_BASE_URL = "https://graph.instagram.com";
 
 // Middleware to check if user is authenticated
 const isAuthenticated = (req, res, next) => {
   if (req.isAuthenticated()) {
     return next();
   }
-  res.status(401).json({ error: 'Not authenticated' });
+  res.status(401).json({ error: "Not authenticated" });
 };
 
 // Get user profile
-router.get('/profile', isAuthenticated, (req, res) => {
+router.get("/profile", isAuthenticated, (req, res) => {
   res.json(req.user);
 });
 
 // Fetch user media
-router.get('/media', isAuthenticated, async (req, res) => {
+router.get("/media", isAuthenticated, async (req, res) => {
   try {
-    const response = await axios.get(`https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${req.user.accessToken}`);
-    
-    // Update user's media in database
-    await User.findByIdAndUpdate(req.user._id, { media: response.data.data });
-    
+    const response = await axios.get(
+      `${INSTAGRAM_API_BASE_URL}/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,username&access_token=${req.user.accessToken}`
+    );
+
+    // Update user's media in database only if it has changed
+    const existingMedia = req.user.media || [];
+    if (JSON.stringify(existingMedia) !== JSON.stringify(response.data.data)) {
+      await User.findByIdAndUpdate(req.user._id, { media: response.data.data });
+    }
+
     res.json(response.data.data);
   } catch (error) {
-    console.error('Error fetching media:', error);
-    res.status(500).json({ error: 'Failed to fetch media' });
+    console.error(
+      "Error fetching media:",
+      error.response?.data || error.message
+    );
+
+    // Handle token expiry
+    if (
+      error.response?.status === 400 &&
+      error.response?.data?.error?.type === "OAuthException"
+    ) {
+      return res
+        .status(401)
+        .json({ error: "Access token expired. Please log in again." });
+    }
+
+    res.status(500).json({
+      error: "Failed to fetch media from Instagram. Please try again later.",
+    });
   }
 });
 
 // Get comments for a specific media
-router.get('/media/:mediaId/comments', isAuthenticated, async (req, res) => {
+router.get("/media/:mediaId/comments", isAuthenticated, async (req, res) => {
   try {
     const comments = await Comment.find({ mediaId: req.params.mediaId });
     res.json(comments);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch comments' });
+    console.error("Error fetching comments:", error.message);
+    res.status(500).json({ error: "Failed to fetch comments" });
   }
 });
 
 // Add a comment to media
-router.post('/media/:mediaId/comments', isAuthenticated, async (req, res) => {
+router.post("/media/:mediaId/comments", isAuthenticated, async (req, res) => {
   try {
-    const { text } = req.body;
-    
     const comment = new Comment({
       mediaId: req.params.mediaId,
-      text,
-      username: req.user.username
+      userId: req.user._id,
+      text: req.body.text,
     });
-    
     await comment.save();
     res.status(201).json(comment);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to add comment' });
-  }
-});
-
-// Add a reply to a comment
-router.post('/comments/:commentId/replies', isAuthenticated, async (req, res) => {
-  try {
-    const { text } = req.body;
-    
-    const comment = await Comment.findById(req.params.commentId);
-    if (!comment) {
-      return res.status(404).json({ error: 'Comment not found' });
-    }
-    
-    comment.replies.push({
-      username: req.user.username,
-      text
-    });
-    
-    await comment.save();
-    res.status(201).json(comment);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to add reply' });
+    console.error("Error adding comment:", error.message);
+    res.status(500).json({ error: "Failed to add comment" });
   }
 });
 

@@ -2,15 +2,14 @@ const passport = require("passport");
 const InstagramStrategy = require("passport-instagram").Strategy;
 const User = require("../models/User");
 
-console.log("INSTAGRAM_APP_ID:", process.env.INSTAGRAM_APP_ID);
-console.log("INSTAGRAM_APP_SECRET:", process.env.INSTAGRAM_APP_SECRET);
-
 passport.use(
   new InstagramStrategy(
     {
-      clientID: process.env.INSTAGRAM_APP_ID,
-      clientSecret: process.env.INSTAGRAM_APP_SECRET,
-      callbackURL: "/auth/instagram/callback",
+      clientID: process.env.REACT_APP_INSTAGRAM_APP_ID,
+      clientSecret: process.env.REACT_APP_INSTAGRAM_APP_SECRET,
+      callbackURL:
+        process.env.REACT_APP_INSTAGRAM_REDIRECT_URI ||
+        "http://localhost:5000/auth/instagram/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -22,7 +21,7 @@ passport.use(
             instagramId: profile.id,
             username: profile.username,
             name: profile.displayName,
-            profilePicture: profile._json.data.profile_picture,
+            profilePicture: profile._json?.data?.profile_picture || "",
             accessToken,
           });
         } else {
@@ -33,6 +32,7 @@ passport.use(
         await user.save();
         return done(null, user);
       } catch (err) {
+        console.error("Error in InstagramStrategy:", err);
         return done(err);
       }
     }
