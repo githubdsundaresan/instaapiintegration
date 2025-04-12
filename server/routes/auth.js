@@ -5,11 +5,12 @@ const axios = require("axios");
 const qs = require("qs");
 const router = express.Router();
 
-const FB_GRAPH_BASE_URL = "https://www.facebook.com/v19.0";
+const FB_LOGIN_BASE_URL = "https://www.facebook.com/v19.0";
+const FB_GRAPH_BASE_URL = "https://graph.facebook.com/v19.0";
 
 // Redirect to Facebook Login Dialog
 router.get("/instagram", (req, res) => {
-  const facebookLoginUrl = `${FB_GRAPH_BASE_URL}/dialog/oauth?client_id=${process.env.FB_APP_ID}&redirect_uri=${process.env.FB_REDIRECT_URI}&scope=instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement&response_type=code`;
+  const facebookLoginUrl = `${FB_LOGIN_BASE_URL}/dialog/oauth?client_id=${process.env.FB_APP_ID}&redirect_uri=${process.env.FB_REDIRECT_URI}&scope=instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement&response_type=code`;
   console.log("Redirecting to Facebook Login:", facebookLoginUrl);
   res.redirect(facebookLoginUrl);
 });
@@ -23,7 +24,7 @@ router.get("/facebook/callback", async (req, res) => {
   try {
     console.log("1. Exchanging code for access token");
     const tokenResponse = await axios.get(
-      `https://graph.facebook.com/v19.0/oauth/access_token`,
+      `${FB_GRAPH_BASE_URL}/oauth/access_token`,
       {
         params: {
           client_id: process.env.FB_APP_ID,
