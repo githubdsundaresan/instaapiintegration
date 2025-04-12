@@ -5,7 +5,7 @@ const axios = require("axios");
 const qs = require("qs");
 const router = express.Router();
 
-const FB_GRAPH_BASE_URL = "https://graph.facebook.com/v19.0";
+const FB_GRAPH_BASE_URL = "https://www.facebook.com/v19.0";
 
 // Redirect to Facebook Login Dialog
 router.get("/instagram", (req, res) => {
@@ -15,7 +15,7 @@ router.get("/instagram", (req, res) => {
 });
 
 // Callback from Facebook Login
-router.get("/instagram/callback", async (req, res) => {
+router.get("/facebook/callback", async (req, res) => {
   const { code } = req.query;
   if (!code)
     return res.status(400).json({ success: false, error: "Missing code" });
@@ -33,6 +33,9 @@ router.get("/instagram/callback", async (req, res) => {
         },
       }
     );
+    if (!tokenResponse.data.access_token) {
+      throw new Error("Access token missing in token response");
+    }
     const userAccessToken = tokenResponse.data.access_token;
     console.log("✅ Got userAccessToken:", userAccessToken);
 
