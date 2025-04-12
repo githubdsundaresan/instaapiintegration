@@ -8,7 +8,7 @@ const INSTAGRAM_OAUTH_URL = "https://api.instagram.com/oauth/access_token";
 
 // Instagram login route
 router.get("/instagram", (req, res) => {
-  const instagramLoginUrl = `https://www.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${process.env.INSTAGRAM_REDIRECT_URI}&scope=user_profile,user_media&response_type=code`;
+  const instagramLoginUrl = `https://www.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${process.env.INSTAGRAM_REDIRECT_URI}&&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights`;
   res.redirect(instagramLoginUrl);
 });
 
