@@ -21,7 +21,7 @@ router.get("/instagram/callback", async (req, res) => {
     return res.status(400).json({ success: false, error: "Missing code" });
 
   try {
-    // Exchange code for access token
+    console.log("1. Exchanging code for access token");
     const tokenResponse = await axios.get(
       `${FB_GRAPH_BASE_URL}/oauth/access_token`,
       {
@@ -34,15 +34,18 @@ router.get("/instagram/callback", async (req, res) => {
       }
     );
     const userAccessToken = tokenResponse.data.access_token;
+    console.log("✅ Got userAccessToken:", userAccessToken);
 
-    // Get Facebook Pages managed by the user
+    console.log("2. Getting user's Facebook Pages...");
     const pagesResponse = await axios.get(`${FB_GRAPH_BASE_URL}/me/accounts`, {
       params: { access_token: userAccessToken },
     });
     const page = pagesResponse.data.data[0];
+    if (!page) throw new Error("No pages found");
     const pageAccessToken = page.access_token;
+    console.log("✅ Got Page ID:", page.id);
 
-    // Get Instagram Business Account linked to the page
+    console.log("3. Getting linked Instagram Business Account...");
     const igAccountResponse = await axios.get(
       `${FB_GRAPH_BASE_URL}/${page.id}`,
       {
@@ -52,9 +55,11 @@ router.get("/instagram/callback", async (req, res) => {
         },
       }
     );
-    const igUserId = igAccountResponse.data.instagram_business_account.id;
+    const igUserId = igAccountResponse.data.instagram_business_account?.id;
+    if (!igUserId) throw new Error("No Instagram Business account found");
+    console.log("✅ Got IG User ID:", igUserId);
 
-    // Get Instagram profile info
+    console.log("4. Fetching Instagram profile...");
     const profileResponse = await axios.get(
       `${FB_GRAPH_BASE_URL}/${igUserId}`,
       {
@@ -65,8 +70,9 @@ router.get("/instagram/callback", async (req, res) => {
       }
     );
     const profile = profileResponse.data;
+    console.log("✅ Got profile:", profile);
 
-    // Get media items
+    console.log("5. Fetching media...");
     const mediaResponse = await axios.get(
       `${FB_GRAPH_BASE_URL}/${igUserId}/media`,
       {
@@ -76,12 +82,10 @@ router.get("/instagram/callback", async (req, res) => {
         },
       }
     );
-    const media = mediaResponse.data.data.map((item) => ({
-      ...item,
-      access_token: pageAccessToken,
-    }));
+    const media = mediaResponse.data.data;
+    console.log("✅ Got media:", media.length, "items");
 
-    // Redirect to frontend with profile and media
+    // Redirect to frontend
     const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
     res.redirect(
       `${CLIENT_URL}/profile?profile=${encodeURIComponent(
