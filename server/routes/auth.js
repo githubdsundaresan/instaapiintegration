@@ -15,6 +15,7 @@ router.get("/instagram", (req, res) => {
 router.get("/instagram/callback", async (req, res) => {
   const { code } = req.query;
 
+  console.log("Received code:", req.query.code);
   console.log("Received callback with code:", code); // Debugging log
 
   if (!code) {
@@ -26,13 +27,23 @@ router.get("/instagram/callback", async (req, res) => {
 
   try {
     // Exchange code for access token
-    const tokenResponse = await axios.post(INSTAGRAM_OAUTH_URL, {
-      client_id: process.env.INSTAGRAM_APP_ID,
-      client_secret: process.env.INSTAGRAM_APP_SECRET,
-      grant_type: "authorization_code",
-      redirect_uri: process.env.INSTAGRAM_REDIRECT_URI,
-      code,
-    });
+    const qs = require("qs");
+
+    const tokenResponse = await axios.post(
+      INSTAGRAM_OAUTH_URL,
+      qs.stringify({
+        client_id: process.env.INSTAGRAM_APP_ID,
+        client_secret: process.env.INSTAGRAM_APP_SECRET,
+        grant_type: "authorization_code",
+        redirect_uri: process.env.INSTAGRAM_REDIRECT_URI,
+        code,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
 
     console.log("Access token response:", tokenResponse.data); // Debugging log
 
@@ -43,21 +54,53 @@ router.get("/instagram/callback", async (req, res) => {
       `${INSTAGRAM_API_BASE_URL}/me?fields=id,username,account_type,media_count&access_token=${access_token}`
     );
 
-    console.log("User profile response:", profileResponse.data); // Debugging log
-
     const profile = profileResponse.data;
-
+    console.log("Access token response:", profileResponse.data);
     // Fetch user media
     const mediaResponse = await axios.get(
       `${INSTAGRAM_API_BASE_URL}/me/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,username&access_token=${access_token}`
     );
 
-    console.log("User media response:", mediaResponse.data); // Debugging log
-
     const media = mediaResponse.data.data;
 
-    // Send profile and media to the frontend
-    res.json({ success: true, profile, media });
+    console.log("Media object:", mediaResponse.data.data); // Debugging log
+
+    router.get("/instagram/media/:mediaId/comments", async (req, res) => {
+      const { mediaId } = req.params;
+      const { access_token } = req.query;
+
+      try {
+        console.log("Fetching comments for media ID:", mediaId); // Debugging log
+        console.log(
+          "Comments URL :",
+          `${INSTAGRAM_API_BASE_URL}/${mediaId}/comments?access_token=${access_token}`
+        ); // Debugging log
+
+        const commentsResponse = await axios.get(
+          `${INSTAGRAM_API_BASE_URL}/${mediaId}/comments?access_token=${access_token}`
+        );
+
+        console.log("Fetched comments from Instagram:", commentsResponse.data); // Debugging log
+
+        res.json({ success: true, comments: commentsResponse.data.data });
+      } catch (error) {
+        console.error(
+          "Error fetching comments:",
+          error.response?.data || error.message
+        );
+        res
+          .status(500)
+          .json({ success: false, error: "Failed to fetch comments." });
+      }
+    });
+
+    // Redirect to the frontend profile page with profile and media data
+    const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+    res.redirect(
+      `${CLIENT_URL}/profile?profile=${encodeURIComponent(
+        JSON.stringify(profile)
+      )}&media=${encodeURIComponent(JSON.stringify(media))}`
+    );
   } catch (error) {
     console.error(
       "Error during Instagram callback:",
