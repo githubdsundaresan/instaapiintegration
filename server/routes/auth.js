@@ -23,7 +23,7 @@ router.get("/facebook/callback", async (req, res) => {
   try {
     console.log("1. Exchanging code for access token");
     const tokenResponse = await axios.get(
-      `${FB_GRAPH_BASE_URL}/oauth/access_token`,
+      `https://graph.facebook.com/v19.0/oauth/access_token`,
       {
         params: {
           client_id: process.env.FB_APP_ID,
