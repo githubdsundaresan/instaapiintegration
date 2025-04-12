@@ -40,6 +40,40 @@ router.get("/instagram/media/:mediaId/comments", async (req, res) => {
   }
 });
 
+// Post a comment to a media item
+router.post("/instagram/media/:mediaId/comments", async (req, res) => {
+  const { mediaId } = req.params;
+  const { access_token, message } = req.body;
+
+  try {
+    console.log("Posting a comment to media ID:", mediaId);
+    console.log("Message:", message);
+    console.log("Access token:", access_token);
+
+    // Make a POST request to the Instagram Graph API
+    const postCommentResponse = await axios.post(
+      `${INSTAGRAM_API_BASE_URL}/${mediaId}/comments`,
+      qs.stringify({ message }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        params: { access_token },
+      }
+    );
+
+    console.log("Comment posted successfully:", postCommentResponse.data);
+
+    res.json({ success: true, comment: postCommentResponse.data });
+  } catch (error) {
+    console.error(
+      "Error posting comment:",
+      error.response?.data || error.message
+    );
+    res.status(500).json({ success: false, error: "Failed to post comment." });
+  }
+});
+
 // Instagram OAuth callback route
 router.get("/instagram/callback", async (req, res) => {
   const { code } = req.query;
