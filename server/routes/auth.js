@@ -112,7 +112,7 @@ router.get("/instagram/callback", async (req, res) => {
 
     // Fetch profile
     const profileResponse = await axios.get(
-      `${INSTAGRAM_API_BASE_URL}/me?fields=id,username,account_type,media_count,followers_count,biography&access_token=${access_token}`
+      `${INSTAGRAM_API_BASE_URL}/me?fields=id,username,account_type,media_count,followers_count&access_token=${access_token}`
     );
     const profile = profileResponse.data;
 
