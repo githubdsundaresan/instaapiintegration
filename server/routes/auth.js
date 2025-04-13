@@ -1,126 +1,37 @@
-// auth.js — Using Facebook Login + Instagram Graph API
-
 const express = require("express");
 const axios = require("axios");
 const qs = require("qs");
 const router = express.Router();
 
-const FB_LOGIN_BASE_URL = "https://www.facebook.com/v19.0";
-const FB_GRAPH_BASE_URL = "https://graph.facebook.com/v19.0";
+const INSTAGRAM_API_BASE_URL = "https://graph.instagram.com";
+const INSTAGRAM_OAUTH_URL = "https://api.instagram.com/oauth/access_token";
 
-// Redirect to Facebook Login Dialog
+// Instagram login route
 router.get("/instagram", (req, res) => {
-  const facebookLoginUrl = `${FB_LOGIN_BASE_URL}/dialog/oauth?client_id=${process.env.FB_APP_ID}&redirect_uri=${process.env.FB_REDIRECT_URI}&scope=instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement&response_type=code`;
-  console.log("Redirecting to Facebook Login:", facebookLoginUrl);
-  res.redirect(facebookLoginUrl);
+  const instagramLoginUrl = `https://www.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${process.env.INSTAGRAM_REDIRECT_URI}&&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights`;
+  res.redirect(instagramLoginUrl);
 });
 
-// Callback from Facebook Login
-router.get("/facebook/callback", async (req, res) => {
-  const { code } = req.query;
-  if (!code)
-    return res.status(400).json({ success: false, error: "Missing code" });
-
-  try {
-    console.log("1. Exchanging code for access token");
-    const tokenResponse = await axios.get(
-      `${FB_GRAPH_BASE_URL}/oauth/access_token`,
-      {
-        params: {
-          client_id: process.env.FB_APP_ID,
-          client_secret: process.env.FB_APP_SECRET,
-          redirect_uri: process.env.FB_REDIRECT_URI,
-          code,
-        },
-      }
-    );
-    if (!tokenResponse.data.access_token) {
-      throw new Error("Access token missing in token response");
-    }
-    const userAccessToken = tokenResponse.data.access_token;
-    console.log("✅ Got userAccessToken:", userAccessToken);
-
-    console.log("2. Getting user's Facebook Pages...");
-    const pagesResponse = await axios.get(`${FB_GRAPH_BASE_URL}/me/accounts`, {
-      params: { access_token: userAccessToken },
-    });
-    const page = pagesResponse.data.data[0];
-    if (!page) throw new Error("No pages found");
-    const pageAccessToken = page.access_token;
-    console.log("✅ Got Page ID:", page.id);
-
-    console.log("3. Getting linked Instagram Business Account...");
-    const igAccountResponse = await axios.get(
-      `${FB_GRAPH_BASE_URL}/${page.id}`,
-      {
-        params: {
-          fields: "instagram_business_account",
-          access_token: pageAccessToken,
-        },
-      }
-    );
-    const igUserId = igAccountResponse.data.instagram_business_account?.id;
-    if (!igUserId) throw new Error("No Instagram Business account found");
-    console.log("✅ Got IG User ID:", igUserId);
-
-    console.log("4. Fetching Instagram profile...");
-    const profileResponse = await axios.get(
-      `${FB_GRAPH_BASE_URL}/${igUserId}`,
-      {
-        params: {
-          fields: "name,username",
-          access_token: pageAccessToken,
-        },
-      }
-    );
-    const profile = profileResponse.data;
-    console.log("✅ Got profile:", profile);
-
-    console.log("5. Fetching media...");
-    const mediaResponse = await axios.get(
-      `${FB_GRAPH_BASE_URL}/${igUserId}/media`,
-      {
-        params: {
-          fields: "id,caption,media_type,media_url,timestamp",
-          access_token: pageAccessToken,
-        },
-      }
-    );
-    const media = mediaResponse.data.data;
-    console.log("✅ Got media:", media.length, "items");
-
-    // Redirect to frontend
-    const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
-    res.redirect(
-      `${CLIENT_URL}/profile?profile=${encodeURIComponent(
-        JSON.stringify(profile)
-      )}&media=${encodeURIComponent(JSON.stringify(media))}`
-    );
-  } catch (err) {
-    console.error(
-      "Instagram Graph API login failed:",
-      err.response?.data || err.message
-    );
-    res.status(500).json({ success: false, error: "Instagram login failed." });
-  }
-});
-
-// Fetch comments for a media item
+// ✅ Comments fetch route — moved OUTSIDE of callback
 router.get("/instagram/media/:mediaId/comments", async (req, res) => {
   const { mediaId } = req.params;
   const { access_token } = req.query;
 
   try {
-    const commentsResponse = await axios.get(
-      `${FB_GRAPH_BASE_URL}/${mediaId}/comments`,
-      {
-        params: { access_token },
-      }
+    console.log("Fetching comments for media ID:", mediaId);
+    console.log(
+      "Comments URL :",
+      `${INSTAGRAM_API_BASE_URL}/${mediaId}/comments?access_token=${access_token}`
     );
+
+    const commentsResponse = await axios.get(
+      `${INSTAGRAM_API_BASE_URL}/${mediaId}/comments?access_token=${access_token}`
+    );
+
     res.json({ success: true, comments: commentsResponse.data.data });
   } catch (error) {
     console.error(
-      "Failed to fetch comments:",
+      "Error fetching comments:",
       error.response?.data || error.message
     );
     res
@@ -139,8 +50,9 @@ router.post("/instagram/media/:mediaId/comments", async (req, res) => {
     console.log("Message:", message);
     console.log("Access token:", access_token);
 
+    // Make a POST request to the Instagram Graph API
     const postCommentResponse = await axios.post(
-      `${FB_GRAPH_BASE_URL}/${mediaId}/comments`,
+      `${INSTAGRAM_API_BASE_URL}/${mediaId}/comments`,
       qs.stringify({ message }),
       {
         headers: {
@@ -150,6 +62,8 @@ router.post("/instagram/media/:mediaId/comments", async (req, res) => {
       }
     );
 
+    console.log("Comment posted successfully:", postCommentResponse.data);
+
     res.json({ success: true, comment: postCommentResponse.data });
   } catch (error) {
     console.error(
@@ -157,6 +71,78 @@ router.post("/instagram/media/:mediaId/comments", async (req, res) => {
       error.response?.data || error.message
     );
     res.status(500).json({ success: false, error: "Failed to post comment." });
+  }
+});
+
+// Instagram OAuth callback route
+router.get("/instagram/callback", async (req, res) => {
+  const { code } = req.query;
+
+  console.log("Received callback with code:", code);
+
+  if (!code) {
+    console.error("Authorization code is missing.");
+    return res
+      .status(400)
+      .json({ success: false, error: "Authorization code is missing." });
+  }
+
+  try {
+    // Exchange code for access token
+    const tokenResponse = await axios.post(
+      INSTAGRAM_OAUTH_URL,
+      qs.stringify({
+        client_id: process.env.INSTAGRAM_APP_ID,
+        client_secret: process.env.INSTAGRAM_APP_SECRET,
+        grant_type: "authorization_code",
+        redirect_uri: process.env.INSTAGRAM_REDIRECT_URI,
+        code,
+      }),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    const { access_token } = tokenResponse.data;
+    console.log("Access token response:", tokenResponse.data);
+
+    // Fetch profile
+    const profileResponse = await axios.get(
+      `${INSTAGRAM_API_BASE_URL}/me?fields=id,username,account_type,media_count&access_token=${access_token}`
+    );
+    const profile = profileResponse.data;
+
+    // Fetch media
+    const mediaResponse = await axios.get(
+      `${INSTAGRAM_API_BASE_URL}/me/media?fields=id,caption,media_type,media_url,thumbnail_url,timestamp,username&access_token=${access_token}`
+    );
+    const media = mediaResponse.data.data;
+
+    // ✅ Add access_token to each media item
+    const mediaWithToken = media.map((item) => ({
+      ...item,
+      access_token,
+    }));
+
+    console.log("Media object with access token:", mediaWithToken);
+
+    // Redirect to frontend
+    const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+    res.redirect(
+      `${CLIENT_URL}/profile?profile=${encodeURIComponent(
+        JSON.stringify(profile)
+      )}&media=${encodeURIComponent(JSON.stringify(mediaWithToken))}`
+    );
+  } catch (error) {
+    console.error(
+      "Error during Instagram callback:",
+      error.response?.data || error.message
+    );
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch data from Instagram." });
   }
 });
 
